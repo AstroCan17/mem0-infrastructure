@@ -173,7 +173,7 @@ export OLLAMA_BASE_URL=http://127.0.0.1:11434
 export MEM0_STORE_PATH=/home/can/.copilot/mem0
 export MEM0_EMBED_MODEL=mxbai-embed-large
 export MEM0_OLLAMA_TIMEOUT_MS=60000
-exec node /usr/local/lib/node_modules/mem0-mcp/dist/bin/mem0-mcp.js
+exec /usr/local/bin/mem0-mcp
 WRAPPER
 
 chmod +x ~/.bifrost/bin/mem0-bifrost
@@ -183,6 +183,42 @@ chmod +x ~/.bifrost/bin/mem0-bifrost
 > - `MEM0_EMBED_MODEL` — Ollama model for embeddings (default: qwen3-embedding:latest)
 > - `MEM0_OLLAMA_TIMEOUT_MS` — Timeout for Ollama API calls (default: 10000, we use 60000)
 > - `MEM0_STORE_PATH` — Directory for SQLite database
+
+**Create systemd user service for Supergateway:**
+
+```bash
+cat > ~/.config/systemd/user/mem0-supergateway.service << 'EOF'
+[Unit]
+Description=mem0-mcp Supergateway (streamableHttp)
+After=network.target ollama.service
+Wants=ollama.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/supergateway \
+  --stdio %h/.bifrost/bin/mem0-bifrost \
+  --outputTransport streamableHttp \
+  --port 8765 \
+  --streamableHttpPath /mcp \
+  --healthEndpoint /healthz \
+  --logLevel info
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
+EOF
+
+systemctl --user daemon-reload
+systemctl --user enable mem0-supergateway
+```
+
+> **Important:** Enable linger so user services survive logout:
+> ```bash
+> sudo loginctl enable-linger $USER
+> ```
 
 ### 2.5 Bifrost (Docker)
 
@@ -247,6 +283,7 @@ BIFROST_CONFIG
 docker pull maximhq/bifrost
 
 docker run -d --name bifrost \
+  --restart unless-stopped \
   -p 8080:8080 \
   -v ~/data:/app/data \
   maximhq/bifrost
@@ -338,12 +375,7 @@ systemctl --user start ollama
 sleep 2
 
 # 2. Supergateway (mem0-mcp bridge)
-nohup supergateway --stdio ~/.bifrost/bin/mem0-bifrost \
-  --outputTransport streamableHttp \
-  --port 8765 \
-  --streamableHttpPath /mcp \
-  --healthEndpoint /healthz \
-  --logLevel info > /tmp/supergateway-8765.log 2>&1 &
+systemctl --user start mem0-supergateway
 sleep 3
 
 # 3. Bifrost
@@ -355,15 +387,18 @@ sleep 5
 
 ```bash
 docker stop bifrost
-
-# Find and stop supergateway
-SG_PID=$(pgrep -f "supergateway.*8765" | head -1)
-[ -n "$SG_PID" ] && kill "$SG_PID"
-
+systemctl --user stop mem0-supergateway
 systemctl --user stop ollama
 ```
 
-### 3.3 Health Check (one-liner)
+### 3.3 Service Status
+
+```bash
+systemctl --user status ollama mem0-supergateway --no-pager
+docker ps --filter name=bifrost
+```
+
+### 3.4 Health Check (one-liner)
 
 ```bash
 echo "Ollama:"; curl -sf http://127.0.0.1:11434/api/tags > /dev/null && echo "  ✓" || echo "  ✗"; \
@@ -386,6 +421,7 @@ echo "mem0 tools:"; curl -sf http://localhost:8080/api/mcp/clients -H "x-bf-vk: 
 | `~/data/config.json` | Bifrost configuration | **High** |
 | `~/.bifrost/bin/mem0-bifrost` | Supergateway wrapper script | **High** |
 | `~/.config/systemd/user/ollama.service` | Ollama systemd service | **Medium** |
+| `~/.config/systemd/user/mem0-supergateway.service` | Supergateway systemd service | **Medium** |
 | `~/data/logs.db` | Bifrost request logs | Low |
 | `~/data/config.db` | Bifrost runtime DB (regenerated from config.json) | Low |
 
@@ -403,6 +439,7 @@ tar czf "$BACKUP_FILE" \
   home/can/data/config.json \
   home/can/.bifrost/bin/mem0-bifrost \
   home/can/.config/systemd/user/ollama.service \
+  home/can/.config/systemd/user/mem0-supergateway.service \
   2>/dev/null
 
 echo "Backup created: $BACKUP_FILE ($(du -h "$BACKUP_FILE" | cut -f1))"
@@ -454,6 +491,7 @@ tar czf "$BACKUP_FILE" \
   home/can/data/config.json \
   home/can/.bifrost/bin/mem0-bifrost \
   home/can/.config/systemd/user/ollama.service \
+  home/can/.config/systemd/user/mem0-supergateway.service \
   2>/dev/null
 
 # Upload to Google Drive
@@ -502,6 +540,7 @@ tar czf "$BACKUP_FILE" \
   home/can/data/config.json \
   home/can/.bifrost/bin/mem0-bifrost \
   home/can/.config/systemd/user/ollama.service \
+  home/can/.config/systemd/user/mem0-supergateway.service \
   2>/dev/null
 
 rclone copy "$BACKUP_FILE" gdrive:mem0-backups/ 2>> "$LOG"
@@ -558,6 +597,11 @@ crontab -l | grep mem0
 - **Cause:** Bifrost auto-reconnect may take 30-60s after supergateway restart.
 - **Fix:** Wait and retry. Check `docker logs bifrost 2>&1 | tail -5`.
 
+### `mem0-health` reports `modelAvailable: false` despite working system
+- **Cause:** Known false negative in the mem0-mcp health check implementation. The internal model availability probe may fail even when Ollama is running and embeddings work correctly.
+- **Diagnosis:** If semantic search (`mem0-memory_search`) returns results with scores, the system is healthy regardless of what `mem0-health` reports.
+- **Workaround:** Use the end-to-end verification commands in Section 2.8 instead of relying on `mem0-health` alone.
+
 ---
 
 ## 6. File Reference
@@ -570,6 +614,7 @@ crontab -l | grep mem0
 | `~/data/config.json` | Bifrost gateway configuration |
 | `~/.bifrost/bin/mem0-bifrost` | Supergateway wrapper with env vars |
 | `~/.config/systemd/user/ollama.service` | Ollama systemd user service |
+| `~/.config/systemd/user/mem0-supergateway.service` | Supergateway systemd user service |
 
 ### Data Files
 
