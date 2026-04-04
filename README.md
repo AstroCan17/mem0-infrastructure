@@ -231,7 +231,11 @@ cat > ~/data/config.json << 'BIFROST_CONFIG'
 {
   "$schema": "https://www.getbifrost.ai/schema",
   "client": {
-    "drop_excess_requests": false
+    "drop_excess_requests": false,
+    "enforce_auth_on_inference": true,
+    "enable_logging": true,
+    "disable_content_logging": true,
+    "log_retention_days": 90
   },
   "mcp": {
     "client_configs": [
@@ -241,20 +245,38 @@ cat > ~/data/config.json << 'BIFROST_CONFIG'
         "connection_string": "http://172.17.0.1:8765/mcp",
         "tools_to_execute": ["*"]
       }
-    ]
+    ],
+    "tool_manager_config": {
+      "tool_execution_timeout": 60
+    }
   },
   "governance": {
     "virtual_keys": [
       {
-        "id": "vk-mem0-access",
-        "name": "mem0-access",
-        "value": "sk-bf-mem0-local",
+        "id": "vk-mem0-admin",
+        "name": "mem0-admin",
+        "value": "sk-bf-mem0-admin",
         "is_active": true,
         "mcp_configs": [
-          {
-            "mcp_client_id": 1,
-            "tools_to_execute": ["*"]
-          }
+          { "mcp_client_id": 1, "tools_to_execute": ["*"] }
+        ]
+      },
+      {
+        "id": "vk-mem0-readwrite",
+        "name": "mem0-readwrite",
+        "value": "sk-bf-mem0-rw",
+        "is_active": true,
+        "mcp_configs": [
+          { "mcp_client_id": 1, "tools_to_execute": ["health","memory_search","memory_store","memory_recall","memory_update"] }
+        ]
+      },
+      {
+        "id": "vk-mem0-readonly",
+        "name": "mem0-readonly",
+        "value": "sk-bf-mem0-ro",
+        "is_active": true,
+        "mcp_configs": [
+          { "mcp_client_id": 1, "tools_to_execute": ["health","memory_search","memory_recall"] }
         ]
       }
     ]
@@ -292,7 +314,9 @@ docker run -d --name bifrost \
 > **Important notes:**
 > - `172.17.0.1` is the Docker bridge IP (host accessible from container)
 > - `connection_type: "http"` uses streamableHttp (NOT SSE — SSE crashes with multiple clients)
-> - Virtual key `sk-bf-mem0-local` is used in the `x-bf-vk` header
+> - `enforce_auth_on_inference: true` — all requests require a valid `x-bf-vk` header
+> - `disable_content_logging: true` — logs request metadata but not memory content (privacy)
+> - Tool names in VK `tools_to_execute` use unprefixed names (e.g., `memory_search` not `mem0-memory_search`)
 > - If config.db exists, Bifrost reads from DB not config.json. Delete config.db to re-bootstrap.
 
 ### 2.6 Firewall (Docker → Host)
@@ -635,7 +659,12 @@ crontab -l | grep mem0
 
 ### Credentials
 
-| Key | Value | Usage |
-|-----|-------|-------|
-| Bifrost Virtual Key | `sk-bf-mem0-local` | `x-bf-vk` header for Bifrost API |
+| Key | Value | Access Level | Usage |
+|-----|-------|-------------|-------|
+| Admin | `sk-bf-mem0-admin` | Full (7 tools) | Infrastructure management, `forget`, `setup_wizard` |
+| Read/Write | `sk-bf-mem0-rw` | Standard (5 tools) | `search`, `store`, `recall`, `update`, `health` |
+| Read-Only | `sk-bf-mem0-ro` | Limited (3 tools) | `search`, `recall`, `health` |
+| Legacy | `sk-bf-mem0-local` | Standard (5 tools) | Backward-compatible, will be deprecated |
+
+> **Auth enforcement is enabled.** Requests without a valid `x-bf-vk` header are rejected (HTTP 401).
 
