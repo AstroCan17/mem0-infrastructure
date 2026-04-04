@@ -98,10 +98,10 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/home/can/.local/bin/ollama serve
+ExecStart=%h/.local/bin/ollama serve
 Restart=on-failure
 RestartSec=3
-Environment=HOME=/home/can
+Environment=HOME=%h
 Environment=OLLAMA_HOST=127.0.0.1:11434
 Environment=OLLAMA_KEEP_ALIVE=-1
 
@@ -167,10 +167,10 @@ mkdir -p ~/.bifrost/bin
 
 cat > ~/.bifrost/bin/mem0-bifrost << 'WRAPPER'
 #!/bin/sh
-export HOME=/home/can
-export PATH=/home/can/.local/bin:/usr/local/bin:/usr/bin:/bin
+export HOME="$HOME"
+export PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin"
 export OLLAMA_BASE_URL=http://127.0.0.1:11434
-export MEM0_STORE_PATH=/home/can/.copilot/mem0
+export MEM0_STORE_PATH="$HOME/.copilot/mem0"
 export MEM0_EMBED_MODEL=mxbai-embed-large
 export MEM0_OLLAMA_TIMEOUT_MS=60000
 exec /usr/local/bin/mem0-mcp
@@ -307,7 +307,7 @@ sudo netfilter-persistent save
 ### 2.7 Copilot CLI MCP Configuration
 
 ```bash
-cat > ~/.copilot/mcp-config.json << 'MCP_CONFIG'
+cat > ~/.copilot/mcp-config.json << MCP_CONFIG
 {
   "mcpServers": {
     "mem0": {
@@ -316,7 +316,7 @@ cat > ~/.copilot/mcp-config.json << 'MCP_CONFIG'
       "args": [],
       "env": {
         "OLLAMA_BASE_URL": "http://127.0.0.1:11434",
-        "MEM0_STORE_PATH": "/home/can/.copilot/mem0",
+        "MEM0_STORE_PATH": "$HOME/.copilot/mem0",
         "MEM0_EMBED_MODEL": "mxbai-embed-large",
         "MEM0_OLLAMA_TIMEOUT_MS": "60000"
       }
@@ -433,13 +433,13 @@ BACKUP_FILE="/tmp/mem0-backup-$(date +%Y%m%d-%H%M%S).tar.gz"
 
 tar czf "$BACKUP_FILE" \
   -C / \
-  home/can/.copilot/mem0/memories.sqlite \
-  home/can/.copilot/session-store.db \
-  home/can/.copilot/mcp-config.json \
-  home/can/data/config.json \
-  home/can/.bifrost/bin/mem0-bifrost \
-  home/can/.config/systemd/user/ollama.service \
-  home/can/.config/systemd/user/mem0-supergateway.service \
+  "${HOME#/}/.copilot/mem0/memories.sqlite" \
+  "${HOME#/}/.copilot/session-store.db" \
+  "${HOME#/}/.copilot/mcp-config.json" \
+  "${HOME#/}/data/config.json" \
+  "${HOME#/}/.bifrost/bin/mem0-bifrost" \
+  "${HOME#/}/.config/systemd/user/ollama.service" \
+  "${HOME#/}/.config/systemd/user/mem0-supergateway.service" \
   2>/dev/null
 
 echo "Backup created: $BACKUP_FILE ($(du -h "$BACKUP_FILE" | cut -f1))"
@@ -485,13 +485,13 @@ rclone config
 BACKUP_FILE="/tmp/mem0-backup-$(date +%Y%m%d-%H%M%S).tar.gz"
 tar czf "$BACKUP_FILE" \
   -C / \
-  home/can/.copilot/mem0/memories.sqlite \
-  home/can/.copilot/session-store.db \
-  home/can/.copilot/mcp-config.json \
-  home/can/data/config.json \
-  home/can/.bifrost/bin/mem0-bifrost \
-  home/can/.config/systemd/user/ollama.service \
-  home/can/.config/systemd/user/mem0-supergateway.service \
+  "${HOME#/}/.copilot/mem0/memories.sqlite" \
+  "${HOME#/}/.copilot/session-store.db" \
+  "${HOME#/}/.copilot/mcp-config.json" \
+  "${HOME#/}/data/config.json" \
+  "${HOME#/}/.bifrost/bin/mem0-bifrost" \
+  "${HOME#/}/.config/systemd/user/ollama.service" \
+  "${HOME#/}/.config/systemd/user/mem0-supergateway.service" \
   2>/dev/null
 
 # Upload to Google Drive
@@ -534,13 +534,13 @@ echo "[$(date)] Starting backup..." >> "$LOG"
 
 tar czf "$BACKUP_FILE" \
   -C / \
-  home/can/.copilot/mem0/memories.sqlite \
-  home/can/.copilot/session-store.db \
-  home/can/.copilot/mcp-config.json \
-  home/can/data/config.json \
-  home/can/.bifrost/bin/mem0-bifrost \
-  home/can/.config/systemd/user/ollama.service \
-  home/can/.config/systemd/user/mem0-supergateway.service \
+  "${HOME#/}/.copilot/mem0/memories.sqlite" \
+  "${HOME#/}/.copilot/session-store.db" \
+  "${HOME#/}/.copilot/mcp-config.json" \
+  "${HOME#/}/data/config.json" \
+  "${HOME#/}/.bifrost/bin/mem0-bifrost" \
+  "${HOME#/}/.config/systemd/user/ollama.service" \
+  "${HOME#/}/.config/systemd/user/mem0-supergateway.service" \
   2>/dev/null
 
 rclone copy "$BACKUP_FILE" gdrive:mem0-backups/ 2>> "$LOG"
@@ -559,14 +559,14 @@ chmod +x ~/.local/bin/mem0-backup-gdrive.sh
 **Add cron job (daily at 23:00):**
 
 ```bash
-(crontab -l 2>/dev/null; echo "0 23 * * * /home/can/.local/bin/mem0-backup-gdrive.sh") | crontab -
+(crontab -l 2>/dev/null; echo "0 23 * * * $HOME/.local/bin/mem0-backup-gdrive.sh") | crontab -
 ```
 
 **Verify cron:**
 
 ```bash
 crontab -l | grep mem0
-# Expected: 0 23 * * * /home/can/.local/bin/mem0-backup-gdrive.sh
+# Expected: 0 23 * * * $HOME/.local/bin/mem0-backup-gdrive.sh
 ```
 
 ---
