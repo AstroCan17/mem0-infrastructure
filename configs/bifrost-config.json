@@ -1,0 +1,46 @@
+{
+  "$schema": "https://www.getbifrost.ai/schema",
+  "client": {
+    "drop_excess_requests": false
+  },
+  "mcp": {
+    "client_configs": [
+      {
+        "name": "mem0",
+        "connection_type": "http",
+        "connection_string": "http://172.17.0.1:8765/mcp",
+        "tools_to_execute": ["*"]
+      }
+    ]
+  },
+  "governance": {
+    "virtual_keys": [
+      {
+        "id": "vk-mem0-access",
+        "name": "mem0-access",
+        "value": "sk-bf-mem0-local",
+        "is_active": true,
+        "mcp_configs": [
+          {
+            "mcp_client_id": 1,
+            "tools_to_execute": ["*"]
+          }
+        ]
+      }
+    ]
+  },
+  "config_store": {
+    "enabled": true,
+    "type": "sqlite",
+    "config": {
+      "path": "./config.db"
+    }
+  },
+  "logs_store": {
+    "enabled": true,
+    "type": "sqlite",
+    "config": {
+      "path": "./logs.db"
+    }
+  }
+}
