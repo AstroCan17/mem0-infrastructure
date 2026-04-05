@@ -7,6 +7,21 @@
     "disable_content_logging": true,
     "log_retention_days": 90
   },
+  "providers": {
+    "ollama": {
+      "keys": [
+        {
+          "name": "local-ollama",
+          "value": "ollama",
+          "weight": 1,
+          "models": ["mxbai-embed-large", "qwen3-embedding"]
+        }
+      ],
+      "network_config": {
+        "base_url": "http://172.17.0.1:11434"
+      }
+    }
+  },
   "mcp": {
     "client_configs": [
       {

@@ -102,7 +102,7 @@ ExecStart=%h/.local/bin/ollama serve
 Restart=on-failure
 RestartSec=3
 Environment=HOME=%h
-Environment=OLLAMA_HOST=127.0.0.1:11434
+Environment=OLLAMA_HOST=0.0.0.0:11434
 Environment=OLLAMA_KEEP_ALIVE=-1
 
 [Install]
@@ -115,6 +115,11 @@ systemctl --user start ollama
 
 > **Note:** `OLLAMA_KEEP_ALIVE=-1` keeps models loaded permanently in memory.
 > If Ollama was installed to a different path, update `ExecStart` accordingly.
+>
+> **Important:** `OLLAMA_HOST=0.0.0.0:11434` binds Ollama to all network interfaces.
+> This is **required** for Docker containers (Bifrost, etc.) to reach Ollama via the
+> Docker bridge IP (`172.17.0.1`). Using `127.0.0.1` would make Ollama unreachable
+> from containers.
 
 **Pull the embedding model:**
 
