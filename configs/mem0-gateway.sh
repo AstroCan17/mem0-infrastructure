@@ -1,6 +1,6 @@
 #!/bin/sh
-# Legacy wrapper (kept for reference). Prefer configs/mem0-gateway.sh
-# Place at: ~/.bifrost/bin/mem0-bifrost
+# Supergateway wrapper for mem0-mcp
+# Place at: ~/.local/bin/mem0-gateway
 export HOME=/home/YOUR_USER
 export PATH=$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin
 export OLLAMA_BASE_URL=http://127.0.0.1:11434

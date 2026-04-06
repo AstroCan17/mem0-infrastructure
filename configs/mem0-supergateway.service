@@ -6,7 +6,7 @@ Wants=ollama.service
 [Service]
 Type=simple
 ExecStart=/usr/local/bin/supergateway \
-  --stdio %h/.bifrost/bin/mem0-bifrost \
+  --stdio %h/.local/bin/mem0-gateway \
   --outputTransport streamableHttp \
   --port 8765 \
   --streamableHttpPath /mcp \
