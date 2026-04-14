@@ -92,47 +92,39 @@ Each CLI container:
 
 ## 3. Architecture Diagram
 
-```
-┌────────────────────────────────────────────────────────────────┐
-│                           User                                  │
-└──────────────────┬─────────────────────────────────────────────┘
-                   │
-       ┌───────────┴─────────────────────────────────────────────┐
-       │                   Agent CLI Containers                    │
-       │ (mem0chat / codex / claude / gemini / opencode / copilot)│
-       └───────────┬─────────────────────────────────────────────┘
-                   │
-     ┌─────────────┴───────────────┬─────────────────────────────┐
-     │                             │                             │
-     ▼                             ▼                             ▼
-┌───────────────┐           ┌───────────────┐              ┌────────────┐
-│ Supergateway  │           │ Supergateway  │     ...      │ Supergateway│
-│ (per-agent)   │           │ (per-agent)   │              │ (per-agent) │
-│ HTTP/87xx     │           │ HTTP/87xx     │              │ HTTP/87xx   │
-└──────┬────────┘           └──────┬────────┘              └──────┬───────┘
-       │                           │                             │
-       ▼                           ▼                             ▼
-┌────────────────────────────────────────────────────────────────┐
-│                          mem0-mcp (per-agent)                   │
-│                (shared DB volume, shared Ollama embedder)        │
-└───────────────┬───────────────────────────┬─────────────────────┘
-                │                           │
-                ▼                           ▼
-          ┌─────────┐                 ┌─────────────┐
-          │ Ollama  │                 │  SQLite DB  │
-          │ (11434) │                 │ /root/.copilot/mem0 │
-          └─────────┘                 └─────────────┘
+```plantuml
+@startuml
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam roundcorner 15
+actor User
+package "Agent CLI Containers" {
+  node "mem0chat / codex / claude / gemini / opencode / copilot" as AgentCLIs
+}
+package "Supergateway (per-agent)" {
+  node "HTTP / 87xx" as Supergateway
+}
+package "mem0-mcp (per-agent)" {
+  node "Shared DB volume\nShared Ollama embedder" as Mem0MCP
+}
+database "SQLite DB\n/root/.copilot/mem0" as SQLiteDB
+cloud "Ollama (11434)" as Ollama
+node "Optional: Code Sandbox\n(8080)" as CodeSandbox
 
-                ┌───────────────────────────┐
-                │ Optional: Code Sandbox     │
-                │ (8080)                     │
-                └───────────────────────────┘
+User --> AgentCLIs
+AgentCLIs --> Supergateway
+Supergateway --> Mem0MCP
+Mem0MCP --> SQLiteDB
+Mem0MCP --> Ollama
+CodeSandbox ..> Ollama : uses
+CodeSandbox ..> SQLiteDB : shared workspace
 
-┌─────────────────────────────────────────┐
-│      Docker Compose Volumes             │
-│  • ollama_models (persist models)       │
-│  • mem0_data (persist memories/DB)      │
-└─────────────────────────────────────────┘
+note bottom
+  Docker Compose Volumes:
+  - ollama_models (persist models)
+  - mem0_data (persist memories/DB)
+end note
+@enduml
 ```
 
 ---
