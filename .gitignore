@@ -1,3 +1,29 @@
 *.sqlite
 *.db
 *.log
+__pycache__/
+*.pyc
+.env
+.env.local
+.env.gpg
+
+# Local/agent artifacts
+.cache/
+.codex/
+.codex
+.gemini/
+.vscode/
+
+# Docker/local state
+ollama_models/
+workspace/
+
+# GitHub Pages / Jekyll build output
+docs/_site/
+
+# Do not publish Chatbang (private / excluded)
+chatbang/
+chatbang/**
+
+# Editor workspace files
+*.code-workspace

@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify docs folder exists
+        run: test -d docs
+
+      - name: Ensure chatbang is not tracked
+        run: |
+          if git ls-files | grep -q '^chatbang/'; then
+            echo "chatbang/ must not be tracked"
+            exit 1
+          fi
+
+      - name: Validate Docker Compose config
+        run: docker compose -f compose/docker-compose.yml config

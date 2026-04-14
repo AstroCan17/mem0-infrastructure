@@ -1,0 +1,26 @@
+flowchart TD
+  subgraph ComposeStack
+    OLLAMA[Ollama service\n(ollama/Dockerfile)]
+    MEM0[Mem0-Supergateway (per-agent)\n(mem0chat/Dockerfile)\nports 8766-8772]
+    CODE[Code Sandbox / Agent Gateway\n(chatbang/Dockerfile)]
+  end
+
+  subgraph External
+    OCZ[OpenCode Zen API\nhttps://opencode.ai/zen/v1/chat/completions]
+  end
+
+  subgraph Standalone
+    CLI[mem0chat CLI client\n(root Dockerfile)]
+  end
+
+  CLI -->|HTTP MCP requests| MEM0
+  CLI -->|Inference requests| OCZ
+
+  MEM0 -->|Embedding requests| OLLAMA
+
+  CODE -->|Memory / MCP access| MEM0
+  CODE -->|Embedding requests| OLLAMA
+  CODE -->|Workspace mount| WORKSPACE[workspace/ volume]
+
+  OLLAMA -->|Model storage| OLLAMAVOL[ollama_models volume]
+  MEM0 -->|Memory store| MEM0VOL[mem0_data volume]

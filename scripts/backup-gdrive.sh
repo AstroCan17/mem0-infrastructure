@@ -16,7 +16,7 @@ tar czf "$BACKUP_FILE" \
   "${HOME_DIR#/}/.copilot/session-store.db" \
   "${HOME_DIR#/}/.copilot/mcp-config.json" \
   "${HOME_DIR#/}/data/config.json" \
-  "${HOME_DIR#/}/.bifrost/bin/mem0-bifrost" \
+  "${HOME_DIR#/}/.local/bin/mem0-gateway" \
   "${HOME_DIR#/}/.config/systemd/user/ollama.service" \
   "${HOME_DIR#/}/.config/systemd/user/mem0-supergateway.service" \
   2>/dev/null

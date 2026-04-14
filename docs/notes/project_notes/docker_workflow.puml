@@ -1,0 +1,124 @@
+@startuml "Mem0 Infrastructure Component Diagram"
+!theme spacelab
+skinparam componentStyle uml2
+skinparam handwritten false
+
+title Mem0 Docker Component Diagram with JSON metadata
+
+package "Build / Orchestration" {
+  component "docker-compose.yml" as COMPOSE
+  component "ollama/Dockerfile" as DF_OLLAMA
+  component "mem0chat/Dockerfile" as DF_MEM0
+  component "chatbang/Dockerfile" as DF_CODE
+  component "Dockerfile (root)" as DF_ROOT
+}
+
+package "Runtime Services" {
+  component "Ollama service\n(port 11435)" as OLLAMA
+  component "Mem0 Supergateway (per-agent)\n(ports 8766-8772)" as MEM0
+  component "Code Sandbox\n(port 8080)" as CODE
+  component "CLI Client\n(no public port)" as CLI
+}
+
+package "External" {
+  component "OpenCode Zen API\nhttps://opencode.ai/zen/v1/chat/completions" as OCZ
+}
+
+package "Volumes" {
+  node "workspace volume" as WORKSPACE
+  node "ollama_models volume" as OLLAMAVOL
+  node "mem0_data volume" as MEM0VOL
+}
+
+json "docker-compose.yml metadata" as COMPOSE_JSON {
+  {
+    "services": [
+      {
+        "name": "ollama",
+        "build": "ollama/Dockerfile",
+        "ports": ["11435:11434"],
+        "volumes": ["ollama_models:/root/.ollama"],
+        "environment": ["OLLAMA_HOST=0.0.0.0:11434", "OLLAMA_KEEP_ALIVE=-1"]
+      },
+      {
+        "name": "mem0-mcp-*",
+        "build": "mem0chat/Dockerfile",
+        "depends_on": ["ollama"],
+        "ports": ["8766:8765", "8767:8765", "8768:8765", "8769:8765", "8770:8765", "8771:8765", "8772:8765"],
+        "volumes": ["mem0_data:/root/.copilot/mem0"],
+        "environment": ["OLLAMA_BASE_URL=http://ollama:11434", "MEM0_STORE_PATH=/root/.copilot/mem0"]
+      },
+      {
+        "name": "code-sandbox",
+        "build": "chatbang/Dockerfile",
+        "depends_on": ["ollama", "mem0-mcp"],
+        "ports": ["8080:8080"],
+        "volumes": ["./workspace:/app/workspace", "mem0_data:/root/.copilot/mem0"],
+        "environment": ["AGENT_GATEWAY_PORT=8080"]
+      }
+    ]
+  }
+}
+
+json "ollama/Dockerfile metadata" as J_OLLAMA {
+  {
+    "from": "ollama/ollama:latest",
+    "entrypoint": "/entrypoint.sh",
+    "expose": ["11434"]
+  }
+}
+
+json "mem0chat/Dockerfile metadata" as J_MEM0 {
+  {
+    "from": "node:20-slim",
+    "packages": ["supergateway", "@mem0/cli", "mem0-mcp"],
+    "expose": ["8765"],
+    "command": "supergateway --stdio mem0-gateway --outputTransport streamableHttp --port 8765"
+  }
+}
+
+json "chatbang/Dockerfile metadata" as J_CODE {
+  {
+    "from": "mcr.microsoft.com/playwright/python:v1.58.0-jammy",
+    "requirements": ["fastapi", "uvicorn", "pydantic", "playwright", "mem0ai", "chromadb", "ollama", "httpx", "google-generativeai", "openai", "prompt_toolkit", "rich"],
+    "expose": ["8080"],
+    "command": "python3 /app/agent_gateway.py"
+  }
+}
+
+json "root Dockerfile metadata" as J_ROOT {
+  {
+    "from": "python:3.13-slim",
+    "requirements": "mem0chat/requirements-mem0chat.txt",
+    "env": ["MEM0_MCP_URL=http://mem0-mcp:8765/mcp", "MEM0_WORKSPACE=copernicus", "MEM0_PROJECT=default"],
+    "command": "python3 mem0chat.py --provider opencode-zen"
+  }
+}
+
+COMPOSE --> COMPOSE_JSON : metadata
+COMPOSE --> OLLAMA : starts service
+COMPOSE --> MEM0 : starts service
+COMPOSE --> CODE : starts service
+COMPOSE --> DF_OLLAMA : builds image
+COMPOSE --> DF_MEM0 : builds image
+COMPOSE --> DF_CODE : builds image
+COMPOSE --> DF_ROOT : builds image
+DF_OLLAMA --> OLLAMA : service image
+DF_MEM0 --> MEM0 : service image
+DF_CODE --> CODE : service image
+DF_ROOT --> CLI : CLI image
+
+CLI --> MEM0 : HTTP MCP requests
+CLI --> OCZ : inference requests
+MEM0 --> OLLAMA : embedding requests
+CODE --> MEM0 : memory / MCP access
+CODE --> OLLAMA : embedding requests
+CODE --> WORKSPACE : workspace mount
+OLLAMA --> OLLAMAVOL : model storage
+MEM0 --> MEM0VOL : memory store
+
+J_OLLAMA --> DF_OLLAMA
+J_MEM0 --> DF_MEM0
+J_CODE --> DF_CODE
+J_ROOT --> DF_ROOT
+@enduml

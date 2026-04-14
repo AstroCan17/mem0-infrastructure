@@ -1,0 +1,286 @@
+version: '3.8'
+
+#
+# v2 notes (Req0–Req3):
+# - Each agent CLI runs in its own container.
+# - Each agent gets its own Mem0 Supergateway port (per-agent Supergateway instance).
+# - All Supergateways share the same persistent DB volume at /root/.copilot/mem0.
+#
+
+x-mem0-mcp-common: &mem0_mcp_common
+  build:
+    context: ..
+    dockerfile: services/mem0-mcp/Dockerfile
+  depends_on:
+    ollama:
+      condition: service_healthy
+  environment:
+    # Shared Mem0 configuration
+    MEM0_STORE_PATH: /root/.copilot/mem0
+    # Ollama embedding service (single shared instance)
+    OLLAMA_BASE_URL: http://ollama:11434
+    MEM0_EMBED_MODEL: mxbai-embed-large:latest
+    MEM0_OLLAMA_TIMEOUT_MS: "60000"
+    # Default scope (override per service)
+    MEM0_WORKSPACE: copernicus
+    MEM0_PROJECT: default
+  volumes:
+    - mem0_data:/root/.copilot/mem0
+  networks:
+    - mem0-network
+  restart: unless-stopped
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:8765/healthz"]
+    interval: 5s
+    timeout: 2s
+    retries: 3
+    start_period: 10s
+
+services:
+  # Ollama: Local embedding and LLM inference engine
+  # Used by Mem0 for semantic embeddings (mxbai-embed-large)
+  # Also available for local LLM inference if needed
+  ollama:
+    build:
+      context: ..
+      dockerfile: services/ollama/Dockerfile
+    container_name: ollama-service
+    ports:
+      - "11435:11434"
+    volumes:
+      # Persist Ollama models across restarts
+      - ollama_models:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+      - OLLAMA_KEEP_ALIVE=-1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "sh", "-c", "[ -d /root/.ollama ] || exit 0"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Mem0 MCP Supergateway: Memory bridge and MCP server
+  # Bridges mem0-mcp (MCP protocol) to HTTP (streamableHttp) on port 8765
+  # Connects to Ollama for embeddings (mxbai-embed-large)
+  # Clients query this service for memory operations
+  mem0-mcp:
+    <<: *mem0_mcp_common
+    container_name: mem0-supergateway-mem0chat
+    ports:
+      - "8766:8765"
+    environment:
+      MEM0_WORKSPACE: copernicus
+      MEM0_PROJECT: mem0chat
+
+  # Per-agent Supergateway fanout (Req2)
+  # Each instance exposes the same container port 8765, but maps to a unique host port.
+  mem0-mcp-codex:
+    <<: *mem0_mcp_common
+    container_name: mem0-supergateway-codex
+    ports:
+      - "8767:8765"
+    environment:
+      MEM0_WORKSPACE: copernicus
+      MEM0_PROJECT: codex
+
+  mem0-mcp-claude:
+    <<: *mem0_mcp_common
+    container_name: mem0-supergateway-claude
+    ports:
+      - "8768:8765"
+    environment:
+      MEM0_WORKSPACE: copernicus
+      MEM0_PROJECT: claude
+
+  mem0-mcp-gemini:
+    <<: *mem0_mcp_common
+    container_name: mem0-supergateway-gemini
+    ports:
+      - "8769:8765"
+    environment:
+      MEM0_WORKSPACE: copernicus
+      MEM0_PROJECT: gemini
+
+  mem0-mcp-opencode:
+    <<: *mem0_mcp_common
+    container_name: mem0-supergateway-opencode
+    ports:
+      - "8770:8765"
+    environment:
+      MEM0_WORKSPACE: copernicus
+      MEM0_PROJECT: opencode
+
+  mem0-mcp-copilot:
+    <<: *mem0_mcp_common
+    container_name: mem0-supergateway-copilot
+    ports:
+      - "8771:8765"
+    environment:
+      MEM0_WORKSPACE: copernicus
+      MEM0_PROJECT: copilot
+
+  mem0-mcp-docker-ai:
+    <<: *mem0_mcp_common
+    container_name: mem0-supergateway-docker-ai
+    ports:
+      - "8772:8765"
+    environment:
+      MEM0_WORKSPACE: copernicus
+      MEM0_PROJECT: docker-ai
+
+  # Agent CLI containers (Req0/Req1)
+  # These are interactive; run with: docker compose --profile agent-clis run --rm -it <service>
+  mem0chat-cli:
+    build:
+      context: ..
+      dockerfile: services/mem0chat-cli/Dockerfile
+    profiles: ["agent-clis"]
+    depends_on:
+      mem0-mcp:
+        condition: service_healthy
+    environment:
+      CHAT_PROVIDER: opencode-zen
+      OPENCODE_ZEN_API_KEY: ${OPENCODE_ZEN_API_KEY}
+      OPENCODE_ZEN_URL: ${OPENCODE_ZEN_URL}
+    command: ["python3", "mem0chat.py", "--mem0-url", "http://mem0-mcp:8765/mcp", "--healthz-url", "http://mem0-mcp:8765/healthz", "--workspace", "copernicus", "--project", "mem0chat"]
+    volumes:
+      - mem0_data:/root/.copilot/mem0
+    networks:
+      - mem0-network
+    stdin_open: true
+    tty: true
+
+  codex-cli:
+    build:
+      context: ..
+      dockerfile: services/mem0chat-cli/Dockerfile
+    profiles: ["agent-clis"]
+    depends_on:
+      mem0-mcp-codex:
+        condition: service_healthy
+    command: ["python3", "mem0chat.py", "--mem0-url", "http://mem0-mcp-codex:8765/mcp", "--healthz-url", "http://mem0-mcp-codex:8765/healthz", "--workspace", "copernicus", "--project", "codex", "--provider", "openai", "--model", "gpt-5.2-codex"]
+    volumes:
+      - mem0_data:/root/.copilot/mem0
+    networks:
+      - mem0-network
+    stdin_open: true
+    tty: true
+
+  claude-cli:
+    build:
+      context: ..
+      dockerfile: services/mem0chat-cli/Dockerfile
+    profiles: ["agent-clis"]
+    depends_on:
+      mem0-mcp-claude:
+        condition: service_healthy
+    environment:
+      CHAT_PROVIDER: opencode-zen
+      OPENCODE_ZEN_API_KEY: ${OPENCODE_ZEN_API_KEY}
+      OPENCODE_ZEN_URL: ${OPENCODE_ZEN_URL}
+    command: ["python3", "mem0chat.py", "--mem0-url", "http://mem0-mcp-claude:8765/mcp", "--healthz-url", "http://mem0-mcp-claude:8765/healthz", "--workspace", "copernicus", "--project", "claude", "--provider", "opencode-zen", "--opencode-zen-model", "claude-sonnet-4-6"]
+    volumes:
+      - mem0_data:/root/.copilot/mem0
+    networks:
+      - mem0-network
+    stdin_open: true
+    tty: true
+
+  gemini-cli:
+    build:
+      context: ..
+      dockerfile: services/mem0chat-cli/Dockerfile
+    profiles: ["agent-clis"]
+    depends_on:
+      mem0-mcp-gemini:
+        condition: service_healthy
+    environment:
+      CHAT_PROVIDER: opencode-zen
+      OPENCODE_ZEN_API_KEY: ${OPENCODE_ZEN_API_KEY}
+      OPENCODE_ZEN_URL: ${OPENCODE_ZEN_URL}
+    command: ["python3", "mem0chat.py", "--mem0-url", "http://mem0-mcp-gemini:8765/mcp", "--healthz-url", "http://mem0-mcp-gemini:8765/healthz", "--workspace", "copernicus", "--project", "gemini", "--provider", "opencode-zen", "--opencode-zen-model", "gemini-3.1-pro"]
+    volumes:
+      - mem0_data:/root/.copilot/mem0
+    networks:
+      - mem0-network
+    stdin_open: true
+    tty: true
+
+  opencode-cli:
+    build:
+      context: ..
+      dockerfile: services/mem0chat-cli/Dockerfile
+    profiles: ["agent-clis"]
+    depends_on:
+      mem0-mcp-opencode:
+        condition: service_healthy
+    environment:
+      CHAT_PROVIDER: opencode-zen
+      OPENCODE_ZEN_API_KEY: ${OPENCODE_ZEN_API_KEY}
+      OPENCODE_ZEN_URL: ${OPENCODE_ZEN_URL}
+    command: ["python3", "mem0chat.py", "--mem0-url", "http://mem0-mcp-opencode:8765/mcp", "--healthz-url", "http://mem0-mcp-opencode:8765/healthz", "--workspace", "copernicus", "--project", "opencode", "--provider", "opencode-zen", "--opencode-zen-model", "opencode/big-pickle"]
+    volumes:
+      - mem0_data:/root/.copilot/mem0
+    networks:
+      - mem0-network
+    stdin_open: true
+    tty: true
+
+  copilot-cli:
+    build:
+      context: ..
+      dockerfile: services/mem0chat-cli/Dockerfile
+    profiles: ["agent-clis"]
+    depends_on:
+      mem0-mcp-copilot:
+        condition: service_healthy
+    environment:
+      CHAT_PROVIDER: opencode-zen
+      OPENCODE_ZEN_API_KEY: ${OPENCODE_ZEN_API_KEY}
+      OPENCODE_ZEN_URL: ${OPENCODE_ZEN_URL}
+    command: ["python3", "mem0chat.py", "--mem0-url", "http://mem0-mcp-copilot:8765/mcp", "--healthz-url", "http://mem0-mcp-copilot:8765/healthz", "--workspace", "copernicus", "--project", "copilot"]
+    volumes:
+      - mem0_data:/root/.copilot/mem0
+    networks:
+      - mem0-network
+    stdin_open: true
+    tty: true
+
+  docker-ai-cli:
+    build:
+      context: ..
+      dockerfile: services/mem0chat-cli/Dockerfile
+    profiles: ["agent-clis"]
+    depends_on:
+      mem0-mcp-docker-ai:
+        condition: service_healthy
+    environment:
+      CHAT_PROVIDER: opencode-zen
+      OPENCODE_ZEN_API_KEY: ${OPENCODE_ZEN_API_KEY}
+      OPENCODE_ZEN_URL: ${OPENCODE_ZEN_URL}
+    command: ["python3", "mem0chat.py", "--mem0-url", "http://mem0-mcp-docker-ai:8765/mcp", "--healthz-url", "http://mem0-mcp-docker-ai:8765/healthz", "--workspace", "copernicus", "--project", "docker-ai"]
+    volumes:
+      - mem0_data:/root/.copilot/mem0
+    networks:
+      - mem0-network
+    stdin_open: true
+    tty: true
+  
+  plantuml:
+    image: plantuml/plantuml-server:jetty
+    ports:
+      - "8888:8080"
+
+# Shared persistent volumes
+volumes:
+  ollama_models:
+    driver: local
+  mem0_data:
+    driver: local
+
+# Shared network for inter-container communication
+networks:
+  mem0-network:
+    driver: bridge

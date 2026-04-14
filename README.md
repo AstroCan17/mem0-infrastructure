@@ -7,6 +7,16 @@ This manual covers fresh installation, daily operations, and backup/restore for 
 mem0 + Supergateway stack used by Copilot/Cursor agents. Bifrost was removed
 to simplify the deployment (no Docker dependency, local-only HTTP bridge).
 
+## Repository docs (GitHub Pages)
+- All implementation plans and architecture docs live under `docs/` (published via GitHub Pages).
+- Start here: `docs/index.md`
+
+## Docker Compose quick start
+```bash
+docker compose -f compose/docker-compose.yml up -d
+curl -s http://localhost:8766/healthz && echo "ok"
+```
+
 ---
 
 ## Table of Contents
@@ -113,7 +123,7 @@ systemctl --user start ollama
 **Pull the embedding model:**
 
 ```bash
-ollama pull mxbai-embed-large
+ollama pull mxbai-embed-large:latest
 # Size: ~670 MB, 1024 dimensions, <1s inference on CPU
 ```
 
@@ -121,7 +131,7 @@ ollama pull mxbai-embed-large
 
 ```bash
 curl -s http://127.0.0.1:11434/api/embed \
-  -d '{"model":"mxbai-embed-large","input":"test"}' \
+  -d '{"model":"mxbai-embed-large:latest","input":"test"}' \
   | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'OK - {len(d[\"embeddings\"][0])} dims')"
 # Expected: OK - 1024 dims
 ```
@@ -165,7 +175,7 @@ export HOME="$HOME"
 export PATH="$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin"
 export OLLAMA_BASE_URL=http://127.0.0.1:11434
 export MEM0_STORE_PATH="$HOME/.copilot/mem0"
-export MEM0_EMBED_MODEL=mxbai-embed-large
+export MEM0_EMBED_MODEL=mxbai-embed-large:latest
 export MEM0_OLLAMA_TIMEOUT_MS=60000
 exec /usr/local/bin/mem0-mcp
 WRAPPER
@@ -229,7 +239,7 @@ cat > ~/.copilot/mcp-config.json << MCP_CONFIG
       "env": {
         "OLLAMA_BASE_URL": "http://127.0.0.1:11434",
         "MEM0_STORE_PATH": "$HOME/.copilot/mem0",
-        "MEM0_EMBED_MODEL": "mxbai-embed-large",
+        "MEM0_EMBED_MODEL": "mxbai-embed-large:latest",
         "MEM0_OLLAMA_TIMEOUT_MS": "60000"
       }
     }
@@ -253,7 +263,8 @@ curl -s http://127.0.0.1:8765/healthz | grep -q "ok" && echo "✓ Supergateway: 
 # 3. mem0 health via Supergateway
 curl -s -X POST http://127.0.0.1:8765/mcp \
   -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"mem0-health","arguments":{}}}' \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"health","arguments":{}}}' \
   | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['result']['content'][0]['text'][:100])"
 ```
 
@@ -293,10 +304,48 @@ systemctl --user status ollama mem0-supergateway --no-pager
 ```bash
 echo "Ollama:"; curl -sf http://127.0.0.1:11434/api/tags > /dev/null && echo "  ✓" || echo "  ✗"; \
 echo "Supergateway:"; curl -sf http://127.0.0.1:8765/healthz > /dev/null && echo "  ✓" || echo "  ✗"; \
-echo "mem0-health:"; curl -sf -X POST http://127.0.0.1:8765/mcp -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"mem0-health","arguments":{}}}' > /dev/null && echo "  ✓" || echo "  ✗"
+echo "mem0-health:"; curl -sf -X POST http://127.0.0.1:8765/mcp -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"health","arguments":{}}}' > /dev/null && echo "  ✓" || echo "  ✗"
 ```
 
 ---
+
+### 3.5 Terminal Chat Client (mem0chat + NotebookLM)
+
+This repo includes a lightweight terminal client that can:
+- recall/store per-project memories in the shared mem0 DB (via Supergateway MCP)
+- stream chat responses from OpenAI
+- drive Google NotebookLM via the `nlm` CLI (NotebookLM sources and queries)
+
+**Install (in your conda env):**
+
+```bash
+conda activate agents-env
+pip install -r scripts/requirements-mem0chat.txt
+```
+
+**Run:**
+
+```bash
+conda activate agents-env
+python scripts/mem0chat.py
+```
+
+**No API key (local Ollama chat):**
+
+```bash
+conda activate agents-env
+ollama pull llama3
+python scripts/mem0chat.py --provider ollama --ollama-model llama3
+```
+
+Defaults:
+- mem0 MCP URL: `http://127.0.0.1:8765/mcp`
+- mem0 scope: `workspace=copernicus`, `project=<git-root-folder>`
+- mem0 DB (read-only listing/mapping): `~/.copilot/mem0/memories.sqlite`
+
+NotebookLM:
+- First-time auth: run `/nlm login` (opens Chrome).
+- Per-project notebook setup: `/nlm init` (stores mapping into mem0 so it persists across sessions).
 
 ## 4. Backup & Restore
 

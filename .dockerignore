@@ -1,0 +1,57 @@
+# .dockerignore - Exclude unnecessary files from Docker builds
+# Reduces build context size and build time
+
+# Git files
+.git
+.gitignore
+.gitattributes
+.github
+
+# Documentation
+*.md
+LICENSE
+LICENCE
+ARCHITECTURE_PLAN.md
+README.md
+
+# Development
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.pytest_cache
+*.egg-info
+dist/
+build/
+*.log
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Docker
+docker-compose.override.yml
+Dockerfile.dev
+
+# Data and cache
+.cache
+*.sqlite
+*.db
+ollama_models/
+
+# Temporary
+.tmp
+temp/
+workspace/

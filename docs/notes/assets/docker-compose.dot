@@ -1,0 +1,6 @@
+graph {
+  graph [bgcolor="#ffffff" pad=0.5 ratio="fill"]
+  "services" [shape="component"]
+  "volumes" [shape="component"]
+  "networks" [shape="component"]
+}
