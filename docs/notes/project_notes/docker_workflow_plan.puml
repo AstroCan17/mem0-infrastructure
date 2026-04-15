@@ -9,7 +9,7 @@ package "Build / Orchestration" {
   component "docker-compose.yml" as COMPOSE
   component "ollama/Dockerfile" as DF_OLLAMA
   component "mem0chat/Dockerfile" as DF_MEM0
-  component "chatbang/Dockerfile" as DF_CODE
+  component "hummusapiens/Dockerfile" as DF_CODE
   component "Dockerfile (root)" as DF_ROOT
 }
 
@@ -50,7 +50,7 @@ json "docker-compose.yml metadata" as COMPOSE_JSON {
       },
       {
         "name": "code-sandbox",
-        "build": "chatbang/Dockerfile",
+        "build": "hummusapiens/Dockerfile",
         "depends_on": ["ollama", "mem0-mcp"],
         "ports": ["8080:8080"],
         "volumes": ["./workspace:/app/workspace", "mem0_data:/root/.copilot/mem0"],
@@ -77,7 +77,7 @@ json "mem0chat/Dockerfile metadata" as J_MEM0 {
   }
 }
 
-json "chatbang/Dockerfile metadata" as J_CODE {
+json "hummusapiens/Dockerfile metadata" as J_CODE {
   {
     "from": "mcr.microsoft.com/playwright/python:v1.58.0-jammy",
     "requirements": ["fastapi", "uvicorn", "pydantic", "playwright", "mem0ai", "chromadb", "ollama", "httpx", "google-generativeai", "openai", "prompt_toolkit", "rich"],

@@ -92,7 +92,7 @@ Each CLI container:
 
 ## 3. Architecture Diagram
 
-```plantuml
+```
 @startuml
 skinparam componentStyle rectangle
 skinparam shadowing false

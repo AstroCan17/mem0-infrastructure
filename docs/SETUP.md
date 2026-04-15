@@ -176,7 +176,7 @@ docker inspect <container-name>
 ## Next Steps
 
 1. **Run agent CLIs:** `docker compose --profile agent-clis run --rm -it mem0chat-cli` (or `codex-cli`, `claude-cli`, `gemini-cli`, ...)
-2. **Run chatbang browser:** `docker run -it chatbang --config` (browser automation)
+2. **Run hummusapiens browser:** `docker run -it hummusapiens --config` (browser automation)
 3. **Deploy code sandbox:** Integrate with LLM for automated code execution
 4. **Set up monitoring:** Use Docker events or container logs for observability
 

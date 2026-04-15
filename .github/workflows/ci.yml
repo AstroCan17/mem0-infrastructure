@@ -13,10 +13,10 @@ jobs:
       - name: Verify docs folder exists
         run: test -d docs
 
-      - name: Ensure chatbang is not tracked
+      - name: Ensure hummusapiens is not tracked
         run: |
-          if git ls-files | grep -q '^chatbang/'; then
-            echo "chatbang/ must not be tracked"
+          if git ls-files | grep -q '^hummusapiens/'; then
+            echo "hummusapiens/ must not be tracked"
             exit 1
           fi
 

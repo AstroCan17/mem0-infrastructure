@@ -21,9 +21,9 @@ workspace/
 # GitHub Pages / Jekyll build output
 docs/_site/
 
-# Do not publish Chatbang (private / excluded)
-chatbang/
-chatbang/**
+# Do not publish hummusapiens (private / excluded)
+hummusapiens/
+hummusapiens/**
 
 # Editor workspace files
 *.code-workspace
