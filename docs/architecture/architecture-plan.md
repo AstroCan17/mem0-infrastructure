@@ -92,7 +92,9 @@ Each CLI container:
 
 ## 3. Architecture Diagram
 
+```mermaid
 {% include_relative workflow-diagram_v2.mermaid %}
+```
 
 ---
 
