@@ -1,6 +1,6 @@
 ---
 title: Home
-nav_order: 1
+nav_order: 2
 ---
 
 # mem0-infrastructure
@@ -13,3 +13,8 @@ This site documents the repository structure, architecture, and implementation p
 
 ## Architecture
 - [Communication flow](architecture/communication-flow.md)
+- [Architecture plan](architecture/architecture-plan.md)
+- [Workflow Diagram](notes/project_notes/docker_workflow_plan.puml)
+
+## Installation
+- [Mem0 Infrastructure Setup Guide](SETUP.md)
