@@ -1,0 +1,48 @@
+---
+title: mem0 Infrastructure Architecture
+---
+
+flowchart TB
+    User((User / Developer))
+
+    subgraph External [External Cloud]
+        OCZ[OpenCode Zen API<br/>Inference Engine]
+    end
+
+    subgraph ClientNet [Docker: mem0-client network]
+        CLI[Agent CLI Fleet<br/><i>(mem0chat, codex, claude, gemini,<br/>opencode, copilot, docker-ai)</i>]
+        SB[Code Sandbox<br/>Port 8080]
+    end
+
+    subgraph CoreNet [Docker: mem0-core network]
+        direction TB
+        SG[Supergateways / mem0-mcp<br/>Ports: 8766-8772]
+        OLLAMA[[Ollama Service<br/>Port 11435]]
+    end
+
+    subgraph Storage [Persistent Storage]
+        DB[(mem0_data volume<br/>memories.sqlite)]
+        MODELS[(ollama_models volume)]
+        WORK[Workspace Files]
+    end
+
+    %% Flows
+    User --> CLI
+    CLI -- "1. Inference" --> OCZ
+    CLI -- "2. Memory access (HTTP)" --> SG
+    
+    SG -- "3. Embeddings" --> OLLAMA
+    SG -- "4. Shared CRUD" --> DB
+    
+    SB -- "Tools/MCP" --> SG
+    SB -- "Local Tests" --> OLLAMA
+    SB -- "File I/O" --> WORK
+    
+    OLLAMA -- "Model Storage" --> MODELS
+
+    %% Styling
+    style OCZ fill:#f9f,stroke:#333
+    style OLLAMA fill:#f96,stroke:#333
+    style SG fill:#69f,stroke:#333,color:#fff
+    style DB fill:#eee,stroke:#333
+    style CLI fill:#dfd,stroke:#333

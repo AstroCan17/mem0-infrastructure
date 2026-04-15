@@ -1,0 +1,43 @@
+flowchart LR
+COMPOSE["docker-compose.yml"]
+DF_OLLAMA["ollama/Dockerfile"]
+DF_MEM0["mem0chat/Dockerfile"]
+DF_CODE["hummusapiens/Dockerfile"]
+DF_ROOT["Dockerfile #40;root#41;"]
+OLLAMA["Ollama service<br>#40;port 11435#41;"]
+MEM0["Mem0 Supergateway #40;per-agent#41;<br>#40;ports 8766-8772#41;"]
+CODE["Code Sandbox<br>#40;port 8080#41;"]
+CLI["CLI Client<br>#40;no public port#41;"]
+OCZ["OpenCode Zen API<br>https://opencode.ai/zen/v1/chat/completions"]
+COMPOSE_JSON["COMPOSE_JSON"]
+WORKSPACE["WORKSPACE"]
+OLLAMAVOL["OLLAMAVOL"]
+MEM0VOL["MEM0VOL"]
+J_OLLAMA["J_OLLAMA"]
+J_MEM0["J_MEM0"]
+J_CODE["J_CODE"]
+J_ROOT["J_ROOT"]
+COMPOSE -->|metadata| COMPOSE_JSON
+COMPOSE -->|starts service| OLLAMA
+COMPOSE -->|starts service| MEM0
+COMPOSE -->|starts service| CODE
+COMPOSE -->|builds image| DF_OLLAMA
+COMPOSE -->|builds image| DF_MEM0
+COMPOSE -->|builds image| DF_CODE
+COMPOSE -->|builds image| DF_ROOT
+DF_OLLAMA -->|service image| OLLAMA
+DF_MEM0 -->|service image| MEM0
+DF_CODE -->|service image| CODE
+DF_ROOT -->|CLI image| CLI
+CLI -->|HTTP MCP requests| MEM0
+CLI -->|inference requests| OCZ
+MEM0 -->|embedding requests| OLLAMA
+CODE -->|memory / MCP access| MEM0
+CODE -->|embedding requests| OLLAMA
+CODE -->|workspace mount| WORKSPACE
+OLLAMA -->|model storage| OLLAMAVOL
+MEM0 -->|memory store| MEM0VOL
+J_OLLAMA --> DF_OLLAMA
+J_MEM0 --> DF_MEM0
+J_CODE --> DF_CODE
+J_ROOT --> DF_ROOT
