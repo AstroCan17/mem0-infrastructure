@@ -92,9 +92,8 @@ Each CLI container:
 
 ## 3. Architecture Diagram
 
-```mermaid
-[mem0 Infrastructure Architecture](workflow-diagram_v2.mermaid)
-```
+(workflow-diagram_v2.mermaid)
+
 
 ---
 
