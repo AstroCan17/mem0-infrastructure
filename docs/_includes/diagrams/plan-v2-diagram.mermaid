@@ -1,0 +1,78 @@
+---
+config:
+  theme: 'dark'
+  themeVariables:
+    primaryColor: '#BB2528'
+    primaryTextColor: '#ffffff'
+    primaryBorderColor: '#7C0000'
+    lineColor: '#F8B229'
+    secondaryColor: '#006100'
+    tertiaryColor: '#000000'
+---
+
+
+graph TD
+  subgraph BUILD [Build / Orchestration]
+    direction LR 
+    COMPOSE["docker-compose.yml"]
+    COMPOSE --> Container_OLLAMA
+    COMPOSE --> Container_MEM0
+    COMPOSE --> Container_CODE
+    
+    subgraph DOCKER-CONTAINERS ["DOCKER Containers"]
+      subgraph Container_OLLAMA["Ollama Container"]
+        Service_OLLAMA["Ollama Service<br/>Port 11435"]
+        EMBEDDED_MODEL[(ollama backend model volume<br/>mxbai-embed-large:latest)]
+        Service_OLLAMA --> EMBEDDED_MODEL
+      end
+      Container_OLLAMA["Ollama Container"]
+      Container_MEM0["mem0chat Container"]
+      Container_CODE["hummusapiens Container"]
+    end
+  end
+
+  subgraph EXTERNAL ["External API"]
+    OpenCodeZen["OpenCode Zen API"]
+  end
+
+  %% 2. Katman: Runtime Services
+  subgraph RUNTIME ["Runtime Services"]
+
+    CLI["CLI Client"]
+    CODE["Code Sandbox (8080)"]
+    MEM0["Mem0 Supergateway (8766-8772)"]
+    Service_OLLAMA["Ollama service (11435)"]
+  end
+
+
+
+  %% 3. Katman: Storage
+  subgraph STORAGE ["Persistent Storage"]
+
+    WORK[Workspace Files]
+    EMBEDDED_MODEL[(ollama backend model volume<br/>mxbai-embed-large:latest)]
+    DB[(mem0_data volume<br/>memories.sqlite)]
+  end
+
+
+  Container_OLLAMA -->|provides backend embedded model| Service_OLLAMA
+
+
+  %% Bağlantılar (Block diagram bağlantı mantığı)
+  COMPOSE --> BUILD
+  CLI --> MEM0
+  CLI --> OpenCodeZen
+  MEM0 --> Service_OLLAMA
+  CODE --> MEM0
+  CODE --> Service_OLLAMA
+  
+
+  Service_OLLAMA --> EMBEDDED_MODEL
+  MEM0 --> DB
+  CODE --> WORK
+
+  %% %% Stil atamaları
+  %% style BUILD fill:#BB2528,color:#fff
+  %% style RUNTIME fill:#006100,color:#fff
+  %% style STORAGE fill:#a8b0a2,color:#fff
+  %% style EXTERNAL fill:#619639,color:#fff

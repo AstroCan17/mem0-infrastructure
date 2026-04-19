@@ -1,0 +1,70 @@
+---
+config:
+  theme: 'dark'
+  themeVariables:
+    primaryColor: '#BB2528'
+    primaryTextColor: '#ffffff'
+    primaryBorderColor: '#7C0000'
+    lineColor: '#F8B229'
+    secondaryColor: '#006100'
+    tertiaryColor: '#000000'
+---
+
+
+architecture-beta
+    group container_cli(logos:docker)[Agent CLI Fleet Containers]
+        service mem0chat(disk)[mem0chat] in container_cli
+        service codex(server)[codex] in container_cli
+        service claude(server)[claude] in container_cli
+        service gemini(server)[gemini] in container_cli
+        service opencode(server)[opencode] in container_cli
+        service copilot(server)[copilot] in container_cli
+        service docker_ai(server)[docker ai] in container_cli
+      group gateways(server)[Gateways]
+        service supergateway_mem0chat(server)[Supergateway Mem0Chat] in gateways
+        service supergateway_codex(server)[Supergateway Codex] in gateways
+        service supergateway_claude(server)[Supergateway Claude] in gateways
+        service supergateway_gemini(server)[Supergateway Gemini] in gateways
+        service supergateway_opencode(server)[Supergateway Opencode] in gateways
+        service supergateway_copilot(server)[Supergateway Copilot] in gateways
+        service supergateway_docker_ai(server)[Supergateway Docker AI] in gateways
+
+      group container_servers(logos:docker)[Servers]
+        service ollama_server(server)[Ollama Server] in container_servers
+        service mem0_mcp(server)[mem0 MCP Server] in container_servers
+        
+
+      group container_storage_volume(logos:docker)[Volumes]
+        service DB(disk)[mem0 MCP Database] in container_storage_volume
+        service EMBEDDED_MODEL(disk)[Ollama Embedded Model] in container_storage_volume
+
+    mem0chat:T --> B:supergateway_mem0chat 
+    codex:T --> B:supergateway_codex
+    claude:T --> B:supergateway_claude
+    gemini:T --> B:supergateway_gemini
+    opencode:T --> B:supergateway_opencode
+    copilot:T --> B:supergateway_copilot
+    docker_ai:T --> B:supergateway_docker_ai
+
+    supergateway_mem0chat:T --> B:ollama_server 
+    supergateway_codex:T --> B:ollama_server
+    supergateway_claude:T --> B:ollama_server
+    supergateway_gemini:T --> B:ollama_server
+    supergateway_opencode:T --> B:ollama_server
+    supergateway_copilot:T --> B:ollama_server
+    supergateway_docker_ai:T --> B:ollama_server
+
+    ollama_server:T --> B:mem0_mcp
+    EMBEDDED_MODEL:L <--> R:DB
+    mem0_mcp:T --> B:DB
+
+
+    %% "Semantic Search Model Storage"
+    %% service db(database)[Database] in container_cli
+    %% service disk1(disk)[Storage] in container_cli
+    %% service disk2(disk)[Storage] in container_cli
+    %% service server(server)[Server] in container_cli
+
+    %% db:L -- R:server
+    %% disk1:T -- B:server
+    %% disk2:T -- B:db

@@ -1,20 +1,21 @@
 # mem0 Infrastructure Manual
 
-> **Last updated:** 2026-04-06
+> **Last updated:** 2026-04-18
 > **System:** Kali Linux Rolling 2026.1 • Node.js v22 • Python 3.13
 
-This manual covers fresh installation, daily operations, and backup/restore for the
-mem0 + Supergateway stack used by Copilot/Cursor agents. Bifrost was removed
-to simplify the deployment (no Docker dependency, local-only HTTP bridge).
+Shared memory layer for AI agent CLIs (Cursor, Copilot, Claude Code, OpenCode, Blackbox Pro).
+All agents connect to a single mem0-mcp Supergateway over HTTP, backed by Ollama (embeddings + extraction) and Qdrant (vector store).
 
 ## Repository docs (GitHub Pages)
 - All implementation plans and architecture docs live under `docs/` (published via GitHub Pages).
 - Start here: `docs/index.md`
 
-## Docker Compose quick start
+## Docker Compose quick start (recommended)
+
 ```bash
+cp .env.example .env
 docker compose -f compose/docker-compose.yml up -d
-curl -s http://localhost:8766/healthz && echo "ok"
+./scripts/smoke-test.sh
 ```
 
 ---
@@ -33,33 +34,33 @@ curl -s http://localhost:8766/healthz && echo "ok"
 ## 1. Architecture Overview
 
 ```
-┌─────────────────────┐
-│  Agent CLIs          │
-│  (Copilot / Cursor)  │
-└───────────┬─────────┘
-            │ stdio (default) or HTTP (port 8765)
-            ▼
-      ┌──────────────┐
-      │ Supergateway │  (Node.js bridge)
-      │ stdio→HTTP   │
-      └──────┬───────┘
-             │ stdio
-             ▼
-      ┌──────────────┐
-      │  mem0-mcp    │  (MCP server)
-      └──────┬───────┘
-             │
- ┌───────────┴───────────┐
- ▼                       ▼
-┌─────────────┐      ┌──────────────┐
-│ SQLite      │      │ Ollama       │
-│ memories.db │      │ (embeddings) │
-└─────────────┘      └──────────────┘
+Host CLIs (Cursor, Copilot, Claude Code, OpenCode, Blackbox)
+    │ streamableHttp + workspace/project scope
+    ▼
+┌─────────────────────────────────┐
+│ mem0-mcp Supergateway :8766     │
+│ /mcp (MCP endpoint)             │
+│ /healthz (health check)         │
+└──────┬──────────────┬───────────┘
+       │              │
+┌──────▼──────┐ ┌─────▼──────┐
+│ Ollama      │ │ Qdrant     │
+│ :11435      │ │ :6333      │
+│ embed model │ │ vectors    │
+│ extract LLM │ │ (cosine)   │
+└──────┬──────┘ └─────┬──────┘
+       │              │
+  ollama_models   qdrant_storage   mem0_data (SQLite metadata)
 ```
 
-**Access paths:**
-- **Direct (stdio, recommended):** Copilot/Cursor CLI → mem0-mcp → SQLite + Ollama
-- **HTTP (optional):** Any HTTP client → Supergateway:8765 → mem0-mcp → SQLite + Ollama
+**Docker stack (3 services):**
+- `ollama` — Embedding (mxbai-embed-large) + extraction LLM (qwen3:1.7b)
+- `qdrant` — Vector store (1024-dim, cosine distance)
+- `mem0-mcp` — Supergateway bridging MCP to streamableHttp
+
+**Host CLIs connect via:** `http://127.0.0.1:8766/mcp` with `workspace` + `project` scope per request.
+
+**Native install (systemd):** See Section 2 below for non-Docker setup.
 
 ---
 
@@ -309,44 +310,6 @@ echo "mem0-health:"; curl -sf -X POST http://127.0.0.1:8765/mcp -H "Content-Type
 
 ---
 
-### 3.5 Terminal Chat Client (mem0chat + NotebookLM)
-
-This repo includes a lightweight terminal client that can:
-- recall/store per-project memories in the shared mem0 DB (via Supergateway MCP)
-- stream chat responses from OpenAI
-- drive Google NotebookLM via the `nlm` CLI (NotebookLM sources and queries)
-
-**Install (in your conda env):**
-
-```bash
-conda activate agents-env
-pip install -r scripts/requirements-mem0chat.txt
-```
-
-**Run:**
-
-```bash
-conda activate agents-env
-python scripts/mem0chat.py
-```
-
-**No API key (local Ollama chat):**
-
-```bash
-conda activate agents-env
-ollama pull llama3
-python scripts/mem0chat.py --provider ollama --ollama-model llama3
-```
-
-Defaults:
-- mem0 MCP URL: `http://127.0.0.1:8765/mcp`
-- mem0 scope: `workspace=copernicus`, `project=<git-root-folder>`
-- mem0 DB (read-only listing/mapping): `~/.copilot/mem0/memories.sqlite`
-
-NotebookLM:
-- First-time auth: run `/nlm login` (opens Chrome).
-- Per-project notebook setup: `/nlm init` (stores mapping into mem0 so it persists across sessions).
-
 ## 4. Backup & Restore
 
 ### 4.1 Critical Files
@@ -544,7 +507,17 @@ crontab -l | grep mem0
 | `~/.copilot/mem0/memories.sqlite` | mem0 memory storage (embeddings + content) |
 | `~/.copilot/session-store.db` | Copilot CLI session/conversation history |
 
-### Ports
+### Ports (Docker)
+
+| Port | Service | Protocol |
+|------|---------|----------|
+| 11435 | Ollama | HTTP (embedding + extraction LLM) |
+| 6333 | Qdrant | REST (vector store) |
+| 6334 | Qdrant | gRPC |
+| 8766 | mem0-mcp Supergateway | streamableHttp (MCP) |
+| 8888 | PlantUML (tools profile) | HTTP |
+
+### Ports (Native/systemd)
 
 | Port | Service | Protocol |
 |------|---------|----------|

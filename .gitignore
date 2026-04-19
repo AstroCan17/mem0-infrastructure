@@ -14,12 +14,19 @@ __pycache__/
 .gemini/
 .vscode/
 
+# Cursor IDE (keep mcp.json for shared MCP config)
+.cursor/
+!.cursor/mcp.json
+
 # Docker/local state
 ollama_models/
 workspace/
 
 # GitHub Pages / Jekyll build output
 docs/_site/
+
+# Large reference documents (not for version control)
+docs/source_documents/
 
 # Do not publish hummusapiens (private / excluded)
 hummusapiens/

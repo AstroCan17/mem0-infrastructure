@@ -1,13 +1,31 @@
-```mermaid
+---
+title: "Architecture Diagram"
+config:
+  theme: 'dark'
+  themeVariables:
+    primaryColor: '#BB2528'
+    primaryTextColor: '#ffffff'
+    primaryBorderColor: '#7C0000'
+    lineColor: '#F8B229'
+    secondaryColor: '#006100'
+    tertiaryColor: '#fff'
+---
 
-flowchart TB
+
+%% %%{init: 
+%% {'flowchart': { 'defaultRenderer': 'elk' },
+%% theme: 'dark',
+%% securityLevel: 'loose'}}%%
+graph TB
+    
+
     User((User / Developer))
 
     subgraph External [External Cloud]
         OCZ[OpenCode Zen API<br/>Inference Engine]
     end
 
-    subgraph ClientNet [Docker: mem0-client network]
+    subgraph ClientNet [Docker Containers: mem0-client network]
         CLI["Agent CLI Fleet<br/><i>(mem0chat, codex, claude, gemini,<br/>opencode, copilot, docker-ai)</i>"]
         SB[Code Sandbox<br/>Port 8080]
     end
@@ -20,9 +38,10 @@ flowchart TB
 
     subgraph Storage [Persistent Storage]
         DB[(mem0_data volume<br/>memories.sqlite)]
-        MODELS[(ollama_models volume)]
+        EMBEDDED_MODEL[(ollama backend model volume<br/>mxbai-embed-large:latest)]
         WORK[Workspace Files]
     end
+
 
     %% Flows
     User --> CLI
@@ -36,13 +55,5 @@ flowchart TB
     SB -- "Local Tests" --> OLLAMA
     SB -- "File I/O" --> WORK
     
-    OLLAMA -- "Model Storage" --> MODELS
+    OLLAMA -- "Model Storage" --> EMBEDDED_MODEL
 
-    %% Styling
-    style OCZ fill:#f9f,stroke:#333
-    style OLLAMA fill:#f96,stroke:#333
-    style SG fill:#69f,stroke:#333,color:#fff
-    style DB fill:#eee,stroke:#333
-    style CLI fill:#dfd,stroke:#333
-
-```

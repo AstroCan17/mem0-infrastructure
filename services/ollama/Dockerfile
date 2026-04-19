@@ -1,9 +1,8 @@
 FROM ollama/ollama:latest
 
-# Copy entrypoint script
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+
 COPY services/ollama/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
-
-# Model will be pulled at runtime by the entrypoint script
 
 ENTRYPOINT ["/entrypoint.sh"]
