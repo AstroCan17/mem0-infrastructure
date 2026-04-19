@@ -1,0 +1,58 @@
+---
+config:
+  theme: dark
+  c4: 
+    fontFamily: monospace
+    diagramMarginX: 100
+    diagramMarginY: 100
+    c4ShapeMargin: 80
+    c4ShapePadding: 60
+    boxMargin: 20
+    wrap: true
+---
+
+C4Container
+    
+    title Deployment Diagram for Mem0 Infrastructure (v2)
+
+    Boundary(UserBoundary, "User Environment") {
+        Person(user, "User / Developer", "Interacts with the Agent CLIs for development and research.")
+    }
+    %% Person(user, "User", "Developer or end-user<br/>interacting with the system.")
+
+    Boundary(local, "Ubuntu Local System (Dockerized)") {
+        Container(orchestrator, "Inference Agent CLI (Lead Agent)", "Python", "Orchestrates multi-agent tasks<br/>and executes Dynamic Context Pruning.")
+        Container(mem0_mcp, "Mem0 MCP Server", "Python / REST API", "Centralized gateway for semantic<br/>memory retrieval and storage.")
+        Container(ollama, "Ollama Provider", "Local Service", "Strictly serves as the embedding<br/>backend for memory services.")
+    }
+
+    Boundary(cloud, "External Cloud Services") {
+        System_Ext(qdrant, "Qdrant Cloud", "Vector Database<br/>(Free Tier Cluster)")
+        System_Ext(openai_embed, "OpenAI API", "Embedding Model<br/>text-embedding-3-small")
+        System_Ext(external_llm, "External Inference APIs", "Intelligence Layer:<br/>Gemini, Codex, OpenCode Zen")
+    }
+
+    BiRel(user, orchestrator, "Sends task/query via CLI<br/>Outputs result via Terminal")
+    BiRel(orchestrator, user, "Outputs result", "Terminal")
+    UpdateRelStyle(user, orchestrator, $textColor="#F8B229",$lineColor="#F8B229")
+    Rel(orchestrator, mem0_mcp, "Retrieves raw semantic context", "JSON/HTTP")
+    
+    Rel(mem0_mcp, openai_embed, "Generates vector embeddings", "HTTPS")
+    Rel(mem0_mcp, qdrant, "Performs semantic search", "HTTPS")
+    Rel(mem0_mcp, ollama, "Local embedding requests", "HTTP")
+
+    Rel(orchestrator, external_llm, "Sends optimized prompt (Pruned Context)", "HTTPS")
+    Rel(external_llm, orchestrator, "Returns synthesized response", "JSON")
+    
+
+
+
+    %% Yerleşimi düzenlemek için (Satırda 2 şekil, 1 boundary)
+    %% UpdateLayoutConfig($c4ShapeInRow="2", $c4BoundaryInRow="1")
+
+    %% Stiller
+    UpdateElementStyle(orchestrator, $bgColor="#08427b", $fontColor="#ffffff", $borderColor="#052e51")
+    UpdateElementStyle(ollama, $bgColor="#444444", $fontColor="#ffffff")
+    UpdateRelStyle(orchestrator, external_llm, $textColor="#ff4444", $lineColor="#ff4444")
+
+    %% UpdateLayoutConfig($c4ShapeInRow="4", $c4BoundaryInRow="2")

@@ -1,4 +1,17 @@
-flowchart LR
+---
+config:
+  theme: 'base'
+  themeVariables:
+    primaryColor: '#BB2528'
+    primaryTextColor: '#ffffff'
+    primaryBorderColor: '#7C0000'
+    lineColor: '#F8B229'
+    secondaryColor: '#006100'
+    tertiaryColor: '#fff'
+---
+
+
+flowchart TB
 COMPOSE["docker-compose.yml"]
 DF_OLLAMA["ollama/Dockerfile"]
 DF_MEM0["mem0chat/Dockerfile"]

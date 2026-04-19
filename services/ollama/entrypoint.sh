@@ -1,12 +1,9 @@
 #!/bin/bash
 set -e
 
-# Start Ollama in background
 /bin/ollama serve &
 OLLAMA_PID=$!
 
-# Wait for Ollama to be ready
-sleep 5
 for i in {1..30}; do
   if curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
     echo "Ollama is ready"
@@ -16,11 +13,12 @@ for i in {1..30}; do
   sleep 2
 done
 
-# Pull embedding model
-echo "Pulling mxbai-embed-large model..."
+echo "Pulling embedding model (mxbai-embed-large)..."
 ollama pull mxbai-embed-large:latest
 
-echo "Model downloaded. Ollama ready!"
+echo "Pulling extraction LLM (qwen3:1.7b)..."
+ollama pull qwen3:1.7b
 
-# Keep process running
+echo "All models downloaded. Ollama ready!"
+
 wait $OLLAMA_PID

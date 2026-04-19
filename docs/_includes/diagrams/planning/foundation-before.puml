@@ -1,0 +1,169 @@
+@startuml foundation-before
+!theme plain
+title **BEFORE: Current State (16 services, kaos)**
+
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontSize 11
+skinparam defaultFontName "Courier New"
+skinparam componentStyle rectangle
+skinparam rectangleBorderColor #333333
+skinparam noteBorderColor #CC0000
+skinparam noteBackgroundColor #FFF3F3
+
+skinparam rectangle {
+  BorderColor<<bug>> #CC0000
+  BackgroundColor<<bug>> #FFE0E0
+  FontColor<<bug>> #990000
+  BorderColor<<supergateway>> #4477AA
+  BackgroundColor<<supergateway>> #DDEEFF
+  BorderColor<<cli>> #888888
+  BackgroundColor<<cli>> #F0F0F0
+  BorderColor<<volume>> #996633
+  BackgroundColor<<volume>> #FFF5E0
+  BorderColor<<bloat>> #FF8800
+  BackgroundColor<<bloat>> #FFF0DD
+  FontColor<<bloat>> #885500
+}
+
+' ============================================================
+' DOCKER STACK
+' ============================================================
+
+rectangle "Docker Stack — 16 services on mem0-network (single bridge, no isolation)" as docker #FAFAFA {
+
+  ' --- OLLAMA ---
+  rectangle "**ollama**\n:11435 → :11434\nembedding + chat capable\n\n<color:#CC0000>⚠ FAKE healthcheck:</color>\n<color:#CC0000>[ -d /root/.ollama ] || exit 0</color>\n<color:#CC0000>Reports healthy even if</color>\n<color:#CC0000>Ollama API is DOWN</color>" as ollama <<bug>>
+
+  ' --- 7x SUPERGATEWAY (the bloat) ---
+  rectangle "7× Supergateway Instances (identical image, different ports)" as sgblock <<bloat>> {
+    rectangle "**mem0-mcp**\n:8766 → :8765\nproject: mem0chat" as sg1 <<supergateway>>
+    rectangle "**mem0-mcp-codex**\n:8767 → :8765\nproject: codex" as sg2 <<supergateway>>
+    rectangle "**mem0-mcp-claude**\n:8768 → :8765\nproject: claude" as sg3 <<supergateway>>
+    rectangle "**mem0-mcp-gemini**\n:8769 → :8765\nproject: gemini" as sg4 <<supergateway>>
+    rectangle "**mem0-mcp-opencode**\n:8770 → :8765\nproject: opencode" as sg5 <<supergateway>>
+    rectangle "**mem0-mcp-copilot**\n:8771 → :8765\nproject: copilot" as sg6 <<supergateway>>
+    rectangle "**mem0-mcp-docker-ai**\n:8772 → :8765\nproject: docker-ai" as sg7 <<supergateway>>
+  }
+
+  ' --- 7x CLI CONTAINERS ---
+  rectangle "7× CLI Containers (profile: agent-clis)" as cliblock <<bloat>> {
+    rectangle "mem0chat-cli\nmem0chat.py (1038 lines)\nGPG + Nitro + Ollama chat\n+ NotebookLM integration" as cli1 <<cli>>
+    rectangle "codex-cli" as cli2 <<cli>>
+    rectangle "claude-cli" as cli3 <<cli>>
+    rectangle "gemini-cli" as cli4 <<cli>>
+    rectangle "opencode-cli" as cli5 <<cli>>
+    rectangle "copilot-cli" as cli6 <<cli>>
+    rectangle "docker-ai-cli" as cli7 <<cli>>
+  }
+
+  ' --- PLANTUML ---
+  rectangle "**plantuml**\n:8888 → :8080\n(utility, not on mem0-network)" as plantuml #E8E8E8
+
+}
+
+' ============================================================
+' SHARED VOLUMES
+' ============================================================
+
+database "**mem0_data** volume\nSQLite DB\n<color:#CC0000>Used for BOTH metadata</color>\n<color:#CC0000>AND vector storage</color>\n<color:#CC0000>(no Qdrant = poor quality)</color>" as mem0vol <<bug>>
+
+database "**ollama_models** volume\nPersists model weights" as ollamavol <<volume>>
+
+' ============================================================
+' BUG CALLOUTS
+' ============================================================
+
+note top of sgblock
+  <color:#CC0000><b>BUG: YAML merge silently drops env vars</b></color>
+  Per-service <i>environment:</i> block
+  overwrites the anchor's env vars.
+  <i>MEM0_STORE_PATH</i>, <i>OLLAMA_BASE_URL</i>,
+  <i>MEM0_EMBED_MODEL</i>, <i>MEM0_OLLAMA_TIMEOUT_MS</i>
+  are all silently lost.
+  Only works because mem0-gateway.sh
+  has its own hardcoded defaults.
+end note
+
+note right of ollama
+  <color:#CC0000><b>BUG: mcp-config.json wrong URL</b></color>
+  Uses <i>http://127.0.0.1:11434</i>
+  instead of <i>http://ollama:11434</i>
+  — can't reach Ollama from inside
+  Docker network.
+end note
+
+note bottom of cliblock
+  <color:#CC0000><b>GHOST: code-sandbox</b></color>
+  Referenced in docs/architecture
+  but <b>doesn't exist</b> in compose
+  or anywhere in the repo.
+end note
+
+note bottom of mem0vol
+  <color:#CC0000><b>NO VECTOR DB</b></color>
+  SQLite used for vector storage
+  = poor semantic search quality.
+  Should be Qdrant/Chroma/pgvector.
+end note
+
+' ============================================================
+' RELATIONSHIPS
+' ============================================================
+
+' Supergateways → Ollama
+sg1 --> ollama : embed
+sg2 --> ollama : embed
+sg3 --> ollama : embed
+sg4 --> ollama : embed
+sg5 --> ollama : embed
+sg6 --> ollama : embed
+sg7 --> ollama : embed
+
+' Supergateways → mem0_data
+sg1 --> mem0vol : read/write
+sg2 --> mem0vol
+sg3 --> mem0vol
+sg4 --> mem0vol
+sg5 --> mem0vol
+sg6 --> mem0vol
+sg7 --> mem0vol
+
+' CLIs → their Supergateway
+cli1 --> sg1 : MCP\nstreamableHttp
+cli2 --> sg2
+cli3 --> sg3
+cli4 --> sg4
+cli5 --> sg5
+cli6 --> sg6
+cli7 --> sg7
+
+' CLIs also mount mem0_data (redundant)
+cli1 ..> mem0vol : <color:#CC0000>also mounts\n(redundant)</color>
+cli2 ..> mem0vol
+cli3 ..> mem0vol
+cli4 ..> mem0vol
+cli5 ..> mem0vol
+cli6 ..> mem0vol
+cli7 ..> mem0vol
+
+' Ollama → models volume
+ollama --> ollamavol : models
+
+' ============================================================
+' LEGEND
+' ============================================================
+
+legend bottom right
+  |= Color |= Meaning |
+  | <#FFE0E0> | Critical bug / problem |
+  | <#FFF0DD> | Bloat / unnecessary duplication |
+  | <#DDEEFF> | Supergateway instance |
+  | <#F0F0F0> | CLI container |
+  | <#FFF5E0> | Persistent volume |
+  ---
+  **16 services total:**
+  1 Ollama + 7 Supergateways + 7 CLIs + 1 PlantUML
+  **5 known bugs** identified
+end legend
+
+@enduml

@@ -17,3 +17,6 @@ This site documents the repository structure, architecture, and implementation p
 
 ## Installation
 - [Mem0 Infrastructure Setup Guide](SETUP.md)
+
+## Planning
+- [Plan v2](plans/PLAN_v2.md)

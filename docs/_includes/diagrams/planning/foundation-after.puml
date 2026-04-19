@@ -1,0 +1,166 @@
+@startuml foundation-after
+!theme plain
+title **AFTER: Foundation v2 (3 services, clean)**
+
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontSize 11
+skinparam defaultFontName "Courier New"
+skinparam componentStyle rectangle
+skinparam rectangleBorderColor #333333
+skinparam noteBorderColor #228B22
+skinparam noteBackgroundColor #F0FFF0
+
+skinparam rectangle {
+  BorderColor<<healthy>> #228B22
+  BackgroundColor<<healthy>> #E8F5E9
+  FontColor<<healthy>> #1B5E20
+  BorderColor<<host>> #1565C0
+  BackgroundColor<<host>> #E3F2FD
+  FontColor<<host>> #0D47A1
+  BorderColor<<agent>> #5C6BC0
+  BackgroundColor<<agent>> #E8EAF6
+  BorderColor<<volume>> #6D4C41
+  BackgroundColor<<volume>> #FFF8E1
+  BorderColor<<network>> #37474F
+  BackgroundColor<<network>> #ECEFF1
+  BorderColor<<removed>> #BDBDBD
+  BackgroundColor<<removed>> #F5F5F5
+  FontColor<<removed>> #9E9E9E
+}
+
+' ============================================================
+' HOST MACHINE — Agent CLIs (chat on host, memory via MCP)
+' ============================================================
+
+rectangle "Host Machine — Kali Linux" as host #F5F9FF {
+
+  rectangle "**Cursor IDE**\nchat: own model\nmemory: via MCP" as cursor <<agent>>
+
+  rectangle "**VS Code Copilot**\nchat: own model\nmemory: via MCP" as copilot <<agent>>
+
+  rectangle "**Claude Code CLI**\nchat: Claude\nmemory: via MCP" as claude <<agent>>
+
+  rectangle "**OpenCode CLI**\nchat: Nemotron (free)\nmemory: via MCP" as opencode <<agent>>
+
+  rectangle "**Blackbox Pro CLI**\nchat: Blackbox model\nmemory: via MCP" as blackbox <<agent>>
+
+}
+
+' ============================================================
+' DOCKER STACK — 3 services only
+' ============================================================
+
+rectangle "Docker Stack — 3 services on mem0-network (single bridge, 127.0.0.1 only)" as docker #F1F8E9 {
+
+  rectangle "**mem0-mcp** Supergateway\n127.0.0.1:8766 → :8765\n\nstreamableHttp on /mcp\nhealthz on /healthz\n\n<color:#1B5E20>✓ Connects to ollama (embed + extraction)</color>\n<color:#1B5E20>✓ Connects to qdrant (vector store)</color>\n<color:#1B5E20>✓ SQLite for metadata only</color>" as mem0mcp <<healthy>>
+
+  rectangle "**ollama**\n127.0.0.1:11435 → :11434\n\n**mxbai-embed-large** (embedding, 1024 dim)\n**qwen3:1.7b** (extraction LLM, fact extraction only)\n\n<color:#1B5E20>✓ Healthcheck: curl -f /api/tags</color>\n<color:#1B5E20>✓ Extraction LLM ≠ Chat LLM</color>" as ollama <<healthy>>
+
+  rectangle "**qdrant**\n127.0.0.1:6333 → :6333 (REST)\n127.0.0.1:6334 → :6334 (gRPC)\n\nCollection: **mem0_memories**\nvector_size: 1024, distance: Cosine\nNo API key needed (local)\n\n<color:#1B5E20>✓ Healthcheck: curl -f /healthz</color>\n<color:#1B5E20>✓ Telemetry disabled, WAL enabled</color>" as qdrant <<healthy>>
+
+}
+
+' ============================================================
+' PERSISTENT VOLUMES
+' ============================================================
+
+database "**ollama_models**\nModel weights\n(mxbai-embed-large\n+ qwen3:1.7b)" as ollamavol <<volume>>
+
+database "**qdrant_storage**\nVector data\n(mem0_memories collection)" as qdrantvol <<volume>>
+
+database "**mem0_data**\nSQLite metadata only\n<color:#1B5E20>(vectors now in Qdrant)</color>" as mem0vol <<volume>>
+
+' ============================================================
+' REMOVED COMPONENTS (struck-through)
+' ============================================================
+
+rectangle "REMOVED" as removed <<removed>> {
+  rectangle "<color:#9E9E9E>~~mem0chat.py~~ (1038 lines)</color>\n<color:#9E9E9E>~~7× Supergateway instances~~</color>\n<color:#9E9E9E>~~7× CLI containers~~</color>\n<color:#9E9E9E>~~GPG / Nitro / NotebookLM~~</color>\n<color:#9E9E9E>~~code-sandbox (ghost)~~</color>" as removedItems <<removed>>
+}
+
+' ============================================================
+' RELATIONSHIPS — Host → Docker
+' ============================================================
+
+cursor -down-> mem0mcp : streamableHttp\n+ project scope
+copilot -down-> mem0mcp : streamableHttp\n+ project scope
+claude -down-> mem0mcp : streamableHttp\n+ project scope
+opencode -down-> mem0mcp : streamableHttp\n+ project scope
+blackbox -down-> mem0mcp : streamableHttp\n+ project scope
+
+' ============================================================
+' RELATIONSHIPS — Internal Docker
+' ============================================================
+
+mem0mcp -down-> ollama : embed request\n+ fact extraction
+mem0mcp -down-> qdrant : vector upsert\n/ search
+
+' ============================================================
+' RELATIONSHIPS — Volumes
+' ============================================================
+
+ollama -down-> ollamavol : models
+qdrant -down-> qdrantvol : vectors
+mem0mcp -down-> mem0vol : metadata
+
+' ============================================================
+' NOTES — Design decisions
+' ============================================================
+
+note right of mem0mcp
+  <color:#1B5E20><b>CLEAN: Single Supergateway</b></color>
+  All 5 host CLIs share one instance.
+  Request-level <i>workspace</i> + <i>project</i>
+  params provide memory isolation.
+  No per-client container needed.
+end note
+
+note right of ollama
+  <color:#1B5E20><b>CLEAN: Two roles, one container</b></color>
+  • <b>mxbai-embed-large</b>: semantic embedding
+  • <b>qwen3:1.7b</b>: fact extraction (background)
+  Neither model serves user chat.
+  Extraction LLM ≠ Chat LLM.
+end note
+
+note right of qdrant
+  <color:#1B5E20><b>NEW: Proper vector store</b></color>
+  Replaces SQLite vector storage.
+  Rust-based, low RAM (~256MB).
+  ~4KB per vector, 100K memories ≈ 500MB.
+  API key not required for local.
+end note
+
+note bottom of removed
+  <color:#9E9E9E><b>All removed in Foundation v2</b></color>
+  Chat responsibility moved to host CLIs.
+  MCP handles memory only.
+  Zero unnecessary services.
+end note
+
+' ============================================================
+' LEGEND
+' ============================================================
+
+legend bottom right
+  |= Color |= Meaning |
+  | <#E8F5E9> | Healthy service (verified) |
+  | <#E8EAF6> | Host agent CLI |
+  | <#FFF8E1> | Persistent volume |
+  | <#F5F5F5> | Removed component |
+  ---
+  **3 services total:** Ollama + Qdrant + mem0-mcp
+  **5 host CLIs:** Cursor, Copilot, Claude Code, OpenCode, Blackbox
+  **0 bugs** — all fixed | **$0 cost** — all local
+  ---
+  **Key fixes:**
+  ✓ Real healthchecks (curl, not dir check)
+  ✓ Qdrant replaces SQLite vectors
+  ✓ Single Supergateway (was 7)
+  ✓ No CLI containers (was 7)
+  ✓ mem0chat.py removed (1038 lines)
+  ✓ .env.example + smoke-test.sh
+  ✓ All ports 127.0.0.1 only
+end legend
+
+@enduml
